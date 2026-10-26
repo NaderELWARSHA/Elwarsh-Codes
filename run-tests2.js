@@ -1,0 +1,14 @@
+const assert=require("assert"),SY=require("./sync.js");let p=0,f=0;const t=(n,fn)=>{try{fn();p++;console.log("PASS",n)}catch(x){f++;console.log("FAIL",n,"-",x.message)}};
+const F=o=>({deviceType:"غسالة",brand:"LG",code:"E1",title:"ت",...o});
+t("استيراد صيغة النظام {faultCodes}",()=>{const j={faultCodes:[F(),{kind:"test",deviceType:"غسالة",brand:"LG",title:"تيست",enter:"اضغط"}]};const r=SY.planFaults([],SY.parseFaults(j));assert.equal(r.acc.length,2);assert.equal(r.acc[1].kind,"test");assert.equal(r.acc[0].source,"imported")});
+t("استيراد مصفوفة مباشرة",()=>assert.equal(SY.planFaults([],SY.parseFaults([F()])).acc.length,1));
+t("تيست مود ناقص يُرفض (بدون طريقة الدخول)",()=>assert.equal(SY.planFaults([],[{kind:"test",title:"x"}]).err.length,1));
+t("تكرار بتطبيع عربي وأرقام",()=>{const r=SY.planFaults([{id:"1",...F({code:"E١"})}],[F({code:"e1",brand:"lg"}),F({code:"E2"}),F({code:"E2"})]);assert.equal(r.dup.length,2);assert.equal(r.acc.length,1)});
+t("نفس الكود لماركتين لا يُدمج",()=>assert.equal(SY.planFaults([{id:"1",...F()}],[F({brand:"سامسونج"})]).acc.length,1));
+t("ملف غير صالح",()=>assert.equal(SY.planFaults([],SY.parseFaults({x:1})).next,null));
+t("تصدير ثم استيراد (ذهاب وإياب) بصيغة النظام",()=>{const a=SY.planFaults([],[F(),F({code:"E2",cause:"س\"ب"})]).acc,ex=JSON.parse(JSON.stringify(SY.exportFaults(a)));assert.equal(ex._meta.kind,"fault-codes-only");assert(Array.isArray(ex.faultCodes[0].media));assert.equal(SY.planFaults([],SY.parseFaults(ex)).acc.length,2)});
+t("إضافات كباسات: صيغة rec وصيغة مسطحة",()=>{const r=SY.planComps({},[],SY.parseComps({customCompressors:[{brand:"X",rec:{model:"M1",hp:"1/6",btu:100}},{brand:"Y",model:"M2",hp:"1/4"}]}));assert.equal(r.acc.length,2);assert.equal(r.acc[0].rec.hp,"1/6")});
+t("كباس مكرر مع القاعدة المرجعية ومع الإضافات",()=>{const base={"سامسونج":[{model:"CD124H-L1Z2"}]};const r=SY.planComps(base,[{id:"1",brand:"X",rec:{model:"A"}}],[{brand:"سامسونج",model:"cd124h l1z2"},{brand:"X",model:"a"},{brand:"X",model:"B"}]);assert.equal(r.dup.length,2);assert.equal(r.acc.length,1)});
+t("كباس بدون موديل يُرفض، والقيم لا تتحول",()=>{const r=SY.planComps({},[],[{brand:"X"},{brand:"X",model:"Q",btu:"170.5",evil:"<b>"}]);assert.equal(r.err.length,1);assert.equal(r.acc[0].rec.btu,"170.5");assert(!("evil" in r.acc[0].rec))});
+t("نسخة احتياطية: ذهاب وإياب ورفض التالف",()=>{const D={faults:SY.planFaults([],[F()]).acc,custom:SY.planComps({},[],[{brand:"X",model:"Z",hp:"1"}]).acc};const b=JSON.parse(JSON.stringify(SY.makeBackup(D)));const v=SY.validateBackup(b);assert(v.ok);assert.equal(v.data.faults[0].code,"E1");b.faults[0].code="";assert.equal(SY.validateBackup(b).ok,false);assert.equal(SY.validateBackup({app:"mw-ref",schema:9}).ok,false);assert.equal(SY.validateBackup(null).ok,false)});
+console.log(`\n${p} نجح، ${f} فشل`);process.exit(f?1:0);

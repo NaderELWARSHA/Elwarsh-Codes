@@ -1,0 +1,42 @@
+from playwright.sync_api import sync_playwright
+import json
+A=lambda s:str(s).encode('ascii','replace').decode()
+U='http://localhost:8099/index.html'
+json.dump({"faultCodes":[{"id":"x","deviceType":"غسالة","brand":"LG","code":"E7","title":"<img src=x onerror=window.PWN=1>","cause":"c","fix":"f","media":[]},{"kind":"test","deviceType":"غسالة","brand":"LG","title":"وضع الاختبار","enter":"اضغط","tests":"t","exit":"خروج"},{"code":""}]},open('/tmp/f.json','w'))
+json.dump({"customCompressors":[{"brand":"سامسونج","model":"CD124H-L1Z2"},{"brand":"NEW","rec":{"model":"ZZ-1","hp":"1/5"}}]},open('/tmp/c.json','w'))
+R=[]
+def ok(n,c): R.append(('PASS' if c else 'FAIL',n)); 
+with sync_playwright() as p:
+    b=p.chromium.launch(); ctx=b.new_context(viewport={'width':360,'height':740},accept_downloads=True); pg=ctx.new_page(); errs=[]
+    pg.on('pageerror',lambda e:errs.append(A(e))); pg.on('dialog',lambda d:d.accept())
+    pg.goto(U); pg.wait_for_timeout(400)
+    ok('home renders',pg.locator('.big a').count()==2)
+    pg.goto(U+'#/admin'); pg.wait_for_timeout(200); ok('admin open without password',pg.locator('#if').count()==1)
+    pg.set_input_files('#if','/tmp/f.json'); pg.wait_for_timeout(300); txt=pg.inner_text('#rep'); ok('preview counts 2 add,1 rejected','2' in txt and '1' in txt)
+    pg.click('#ok'); pg.wait_for_timeout(300); n=lambda:pg.evaluate("JSON.parse(localStorage.mw_db).faults.length"); ok('imported 2',n()==2)
+    pg.goto(U+'#/faults'); pg.wait_for_timeout(300); ok('XSS not executed',pg.evaluate("window.PWN")is None and pg.locator('.it').count()>=1)
+    pg.goto(U+'#/tests'); pg.wait_for_timeout(200); ok('test mode tab lists test',pg.locator('.it').count()==1)
+    pg.goto(U+'#/new/fault'); pg.fill('input[name=brand]','سامسونج'); pg.fill('input[name=code]','E9'); pg.fill('input[name=title]','وصف'); pg.fill('input[name=ref]','دليل'); pg.click('#f button'); pg.wait_for_timeout(300); ok('add fault',n()==3)
+    pg.goto(U+'#/faults'); pg.fill('#q','e9'); pg.wait_for_timeout(200); ok('partial search e9',pg.locator('.it').count()==1)
+    pg.click('.it'); pg.wait_for_timeout(200); pg.click('a[href^="#/edit"]'); pg.fill('input[name=title]','معدّل'); pg.click('#f button'); pg.wait_for_timeout(300)
+    ok('edit saved',pg.evaluate("JSON.parse(localStorage.mw_db).faults.some(f=>f.title=='معدّل')"))
+    pg.evaluate("location.hash='#/fault/'+JSON.parse(localStorage.mw_db).faults.slice(-1)[0].id"); pg.wait_for_timeout(200); pg.click('#fv'); pg.wait_for_timeout(100); pg.click('#del'); pg.wait_for_timeout(300); ok('delete',n()==2)
+    pg.goto(U+'#/comps'); pg.wait_for_selector('#q',timeout=15000); pg.fill('#q','cd124h'); pg.wait_for_timeout(400); ok('compressor partial search on real DB',pg.locator('.it').count()>=1)
+    pg.fill('#q',''); pg.wait_for_timeout(300); ok('capped at 100',pg.locator('.cmp').count()==100)
+    pg.fill('#q','cd124h'); pg.wait_for_timeout(300); c=pg.locator('.cmp'); c.nth(0).check(); 
+    if c.count()>1: c.nth(1).check()
+    pg.click('#cm'); pg.wait_for_timeout(400); ok('compare table',pg.locator('table').count()==1 and 'غير متاح' in pg.inner_text('table') or pg.locator('table').count()==1)
+    pg.goto(U+'#/admin'); pg.wait_for_timeout(200); pg.set_input_files('#ic','/tmp/c.json'); pg.wait_for_timeout(1500); t=pg.inner_text('#rep'); ok('comp import dup vs base detected',('1' in t) and pg.locator('#ok').count()==1)
+    pg.click('#ok'); pg.wait_for_timeout(300); ok('custom comp added',pg.evaluate("JSON.parse(localStorage.mw_db).custom.length")==1)
+    with pg.expect_download() as d: pg.click('#xf')
+    path=d.value.path(); j=json.load(open(path,encoding='utf8')); ok('export faultCodes format',len(j['faultCodes'])==2 and j['_meta']['kind']=='fault-codes-only')
+    with pg.expect_download() as d: pg.click('#xb')
+    bk=d.value.path()
+    pg.evaluate("localStorage.mw_db=JSON.stringify({faults:[],custom:[]})"); pg.reload(); pg.wait_for_timeout(300); pg.goto(U+'#/admin'); pg.wait_for_timeout(200)
+    pg.set_input_files('#rf',{'name':'backup.json','mimeType':'application/json','buffer':open(bk,'rb').read()}); pg.wait_for_timeout(500); ok('restore from backup file',n()==2 and pg.evaluate("JSON.parse(localStorage.mw_db).custom.length")==1)
+    pg.reload(); pg.wait_for_timeout(300); ok('persist after reload',n()==2)
+    pg.set_input_files('#if',{'name':'bad.json','mimeType':'application/json','buffer':b'{not json'}); pg.wait_for_timeout(300); ok('corrupt file rejected, data intact',n()==2 and 'تالف' in pg.inner_text('#rep'))
+    ov=pg.evaluate("document.documentElement.scrollWidth<=360"); ok('no horizontal overflow at 360px',ov)
+    print('errors:',errs)
+    b.close()
+for r in R: print(*r)

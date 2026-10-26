@@ -27,6 +27,7 @@ if(q)throw new Error("اقتباس غير مغلق في CSV");if(c||r.length){r.
 if(!rows.length)throw new Error("لا ترويسة");const h=rows.shift().map(x=>x.trim());return rows.filter(a=>a.some(x=>x.trim())).map(a=>Object.fromEntries(h.map((x,i)=>[x,a[i]])))}
 const cell=v=>{v=String(v??"");if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'};
 const toCsv=(k,d)=>{const fs=FIELDS[k].map(f=>f[0]);return "\uFEFF"+[fs.join(","),...d.map(r=>fs.map(f=>cell(r[f])).join(","))].join("\r\n")};
+const toCsvRows=(fs,d)=>"\uFEFF"+[fs.join(","),...d.map(r=>fs.map(f=>cell(r[f])).join(","))].join("\r\n");
 function makeBackup(db,extra={}){return{app:"mrf",schema:SCHEMA,created:new Date().toISOString(),data:db,favorites:extra.favorites||[],history:extra.history||[],settings:extra.settings||{}}}
 function validateBackup(o){if(!o||typeof o!="object")return{ok:false,reason:"ليس ملف نسخة احتياطية"};
 if(o.app!="mrf")return{ok:false,reason:"الملف ليس من هذا التطبيق"};if(o.schema!==SCHEMA)return{ok:false,reason:"إصدار المخطط غير متوافق: "+o.schema};
@@ -41,5 +42,5 @@ set(k,v){try{const s=JSON.stringify(v);ls.setItem(k,s);if(ls.getItem(k)!==s)thro
 function hist(S,key,v,n=8){const a=S.get(key,[]).filter(x=>(v.id?x.id!==v.id:x.q!==v.q));a.unshift(v);return S.set(key,a.slice(0,n))}
 // تنفيذ تغيير مترابط مع تراجع تلقائي إن فشل الحفظ
 function tx(S,key,db,mutate){const before=JSON.stringify(db);mutate(db);if(S.set(key,db))return true;const b=JSON.parse(before);for(const k in db)delete db[k];Object.assign(db,b);return false}
-const api={SCHEMA,MAXFILE,FIELDS,e,norm,need,dupKey,find,na,clean,missing,planImport,checkFile,csv,toCsv,makeBackup,validateBackup,makeStore,hist,tx,uid,today};
+const api={toCsvRows,SCHEMA,MAXFILE,FIELDS,e,norm,need,dupKey,find,na,clean,missing,planImport,checkFile,csv,toCsv,makeBackup,validateBackup,makeStore,hist,tx,uid,today};
 if(typeof module!="undefined")module.exports=api;else g.MR=api})(typeof window!="undefined"?window:globalThis);
