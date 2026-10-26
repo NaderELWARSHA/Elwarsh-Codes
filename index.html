@@ -27,28 +27,26 @@ label{display:block;margin-top:10px;font-size:.9rem;color:var(--mu)}
 </style></head><body>
 <header><div class="lg">م</div><a href="#/">المرجع الفني</a><a href="#/settings" style="flex:0">⚙</a></header>
 <main id="app"></main>
+<script src="core.js"></script>
 <script>
-const FIELDS={
-faults:[["type","نوع الجهاز",1],["brand","الشركة",1],["model","الموديل / السلسلة"],["code","كود العطل",1],["meaning","وصف العطل",1],["causes","الأسباب المحتملة","t"],["steps","خطوات الفحص بالترتيب","t"],["measures","القياسات المطلوبة","t"],["fixes","الحلول المحتملة","t"],["safety","تحذيرات السلامة","t"],["source","المصدر / الرابط"],["reviewed","تاريخ آخر مراجعة","d"],["verified","مؤكدة من مصدر موثوق (نعم/لا)"]],
-comps:[["brand","الشركة",1],["model","رقم الموديل كما على اللوحة",1],["family","السلسلة"],["use","نوع الاستخدام"],["tech","نوع / تقنية الكباس"],["hp","القدرة (حصان)"],["cap","قدرة التبريد (W أو BTU/h)"],["gas","وسيط التبريد"],["volt","الجهد والتردد"],["amps","التيار المقنن وتيار البدء"],["oil","الزيت"],["cc","الإزاحة CC"],["cond","ظروف التشغيل المرجعية"],["wiring","التوصيلات الكهربائية","t"],["dims","الأبعاد / القطع البديلة"],["datasheet","رابط الداتا شيت"],["notes","ملاحظات البدائل والتوافق","t"],["source","المصدر"],["reviewed","تاريخ التحقق","d"]]};
+const {FIELDS,e,norm,need,dupKey,na,csv,toCsv,checkFile,planImport,validateBackup,makeBackup,tx}=MR;
 const TYPES=["غسالة أوتوماتيك","غسالة نصف أوتوماتيك","ثلاجة / ديب فريزر","تكييف","مبرد مياه","سخان مياه","أخرى"];
 const $=s=>document.querySelector(s),app=$("#app");
-const e=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const norm=s=>String(s??"").toLowerCase().replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[\s\-_\/.]/g,"");
-const S={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch{alert("تعذر الحفظ: مساحة التخزين ممتلئة");return false}}};
+const S=MR.makeStore(localStorage);
 const DEMO_SRC="بيانات تجريبية — غير موثّقة";
-let db=S.get("mr_db",null)||{faults:[{id:"d1",demo:1,type:"غسالة أوتوماتيك",brand:"شركة تجريبية",model:"سلسلة X",code:"E-DEMO",meaning:"سجل تجريبي لعرض شكل الصفحة فقط",source:DEMO_SRC},{id:"d2",demo:1,type:"تكييف",brand:"شركة تجريبية",code:"E-DEMO",meaning:"نفس الكود بمعنى مختلف لتوضيح اختلاف الأكواد بين الشركات",source:DEMO_SRC}],
+let db=(x=>x&&Array.isArray(x.faults)&&Array.isArray(x.comps)?x:null)(S.get("mr_db",null))||{faults:[{id:"d1",demo:1,type:"غسالة أوتوماتيك",brand:"شركة تجريبية",model:"سلسلة X",code:"E-DEMO",meaning:"سجل تجريبي لعرض شكل الصفحة فقط",source:DEMO_SRC},{id:"d2",demo:1,type:"تكييف",brand:"شركة تجريبية",code:"E-DEMO",meaning:"نفس الكود بمعنى مختلف لتوضيح اختلاف الأكواد بين الشركات",source:DEMO_SRC}],
 comps:[{id:"c1",demo:1,brand:"شركة تجريبية",model:"DEMO-100",gas:"—",source:DEMO_SRC},{id:"c2",demo:1,brand:"شركة تجريبية",model:"DEMO-200",gas:"—",source:DEMO_SRC}]};
-const save=()=>S.set("mr_db",db);
-let admin=false;const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-const hay=(r,k)=>norm(FIELDS[k].map(f=>r[f[0]]).join(" "));
-const find=(k,q,flt={})=>{const n=norm(q);return db[k].filter(r=>(!n||hay(r,k).includes(n))&&Object.entries(flt).every(([a,b])=>!b||r[a]===b))};
+const save=()=>{const ok=S.set("mr_db",db);if(!ok)alert("تعذر الحفظ: التخزين ممتلئ أو غير متاح. لم يتم تغيير بياناتك.");return ok};
+const commit=f=>{if(!MR.tx(S,"mr_db",db,f)){alert("تعذر الحفظ: التخزين ممتلئ أو غير متاح. لم يتم تغيير بياناتك.");return false}return true};
+let dirty=false,cur=location.hash;
+let admin=false;const uid=MR.uid;
+const find=(k,q,f)=>MR.find(db,k,q,f);
 const uniq=(k,f)=>[...new Set(db[k].map(r=>r[f]).filter(Boolean))].sort();
 const item=(k,r)=>k=="faults"?`<a class="it" href="#/f/${r.id}"><b dir="ltr">${e(r.code)}</b> — ${e(r.meaning)}<div class="mu">${e(r.type)} · ${e(r.brand)} ${e(r.model||"")}</div>${r.demo?'<span class="tag">تجريبي</span>':""}${r.verified=="نعم"?"":'<span class="tag">غير مؤكد</span>'}</a>`:
 `<div class="it"><label style="margin:0;display:flex;gap:8px;align-items:center;color:inherit"><input type="checkbox" class="cmp" value="${r.id}" style="width:22px;height:22px"><a href="#/c/${r.id}" style="color:inherit;text-decoration:none;flex:1"><b dir="ltr">${e(r.model)}</b><div class="mu">${e(r.brand)} ${e(r.family||"")} · ${e(r.gas||"")} ${e(r.volt||"")}</div>${r.demo?'<span class="tag">تجريبي</span>':""}</a></label></div>`;
-const hist=(key,v,n=8)=>{let a=S.get(key,[]).filter(x=>x.id!==v.id&&x.q!==v.q);a.unshift(v);S.set(key,a.slice(0,n))};
+const hist=(key,v,n)=>MR.hist(S,key,v,n);
 function home(){const rs=S.get("mr_rs",[]),rv=S.get("mr_rv",[]),fv=S.get("mr_fv",[]);
-app.innerHTML=`<form id="sf"><input id="q" type="search" placeholder="ابحث بكود عطل أو موديل كباس…" autocomplete="off"></form>
+app.innerHTML=(S.ok?"":'<div class="warn">التخزين المحلي غير متاح: لن تُحفظ أي تغييرات بعد إغلاق الصفحة.</div>')+`<form id="sf"><input id="q" type="search" placeholder="ابحث بكود عطل أو موديل كباس…" autocomplete="off"></form>
 <div class="big"><a href="#/faults">أكواد الأعطال<small>${db.faults.length} سجل</small></a><a href="#/comps">الكباسات<small>${db.comps.length} سجل</small></a></div>
 ${db.faults.concat(db.comps).some(r=>r.demo)?'<div class="warn">البيانات الحالية تجريبية فقط وليست مرجعًا فنيًا. أضف بياناتك الموثّقة من الإدارة ثم احذف التجريبي.</div>':""}
 <div id="res"></div>
@@ -81,20 +79,18 @@ ${k=="faults"?(()=>{const s=db.faults.filter(x=>x.id!=id&&norm(x.code)==norm(r.c
 $("#cp").onclick=()=>navigator.clipboard.writeText(FIELDS[k].filter(([f])=>r[f]).map(([f,l])=>l+": "+r[f]).join("\n")).then(()=>alert("تم النسخ"),()=>alert("تعذر النسخ"));
 $("#fv").onclick=()=>{let a=S.get("mr_fv",[]).filter(x=>x.id!=id);if(!fv)a.unshift({id,t,h});S.set("mr_fv",a);detail(k,id)};
 $("#sh").onclick=()=>{const u=location.href;navigator.share?navigator.share({title:t,url:u}).catch(()=>{}):navigator.clipboard.writeText(u).then(()=>alert("تم نسخ الرابط"))};
-if(admin)$("#del").onclick=()=>{if(confirm("حذف نهائي؟")){snap();db[k]=db[k].filter(x=>x.id!=id);save();location.hash="#/"+(k=="faults"?"faults":"comps")}}}
+if(admin)$("#del").onclick=()=>{if(confirm("حذف نهائي؟")&&(snap()||confirm("تعذر أخذ نسخة احتياطية. متابعة؟"))&&commit(d=>{d[k]=d[k].filter(x=>x.id!=id)}))location.hash="#/"+(k=="faults"?"faults":"comps")}}
 function cmp(ids){const rs=ids.split(",").map(i=>db.comps.find(x=>x.id==i)).filter(Boolean);const fs=FIELDS.comps.filter(([f])=>f!="notes");
-app.innerHTML=`<h2>مقارنة الكباسات</h2><div class="warn">الفروق ملوّنة. الحصان المتشابه لا يعني التكافؤ.</div><div style="overflow-x:auto"><table><tr><th></th>${rs.map(r=>`<th dir="ltr">${e(r.model)}</th>`).join("")}</tr>${fs.map(([f,l])=>{const v=rs.map(r=>r[f]||"—"),d=new Set(v).size>1;return`<tr><td>${l}</td>${v.map(x=>`<td class="${d?"df":""}">${e(x)}</td>`).join("")}</tr>`}).join("")}</table></div>`}
-const need=k=>FIELDS[k].filter(f=>f[2]===1).map(f=>f[0]);
-const dupKey=(k,r)=>norm(k=="faults"?[r.brand,r.model,r.code,r.type].join("|"):[r.brand,r.model].join("|"));
+app.innerHTML=`<h2>مقارنة الكباسات</h2><div class="warn">الفروق ملوّنة. الحصان المتشابه لا يعني التكافؤ.</div><div style="overflow-x:auto"><table><tr><th></th>${rs.map(r=>`<th dir="ltr">${e(r.model)}</th>`).join("")}</tr>${fs.map(([f,l])=>{const v=rs.map(r=>na(r[f])),d=new Set(v).size>1;return`<tr><td>${l}</td>${v.map(x=>`<td class="${d?"df":""}">${e(x)}</td>`).join("")}</tr>`}).join("")}</table></div>`}
 function form(k,id){if(!admin)return location.hash="#/admin";const r=id?db[k].find(x=>x.id==id):{};
 app.innerHTML=`<h2>${id?"تعديل":"إضافة"} ${k=="faults"?"عطل":"كباس"}</h2><form id="f">${FIELDS[k].map(([f,l,o])=>`<label>${l}${o===1?" *":""}${f=="type"?`<select name="${f}">${TYPES.map(t=>`<option ${r[f]==t?"selected":""}>${t}</option>`).join("")}</select>`:o=="t"?`<textarea name="${f}" rows="3">${e(r[f])}</textarea>`:`<input name="${f}" type="${o=="d"?"date":"text"}" value="${e(r[f])}">`}</label>`).join("")}
 <div class="row"><button>حفظ</button><a class="btn alt" href="#/admin" style="text-align:center">إلغاء</a></div></form>`;
-$("#f").onsubmit=ev=>{ev.preventDefault();const n=Object.fromEntries([...new FormData(ev.target)].map(([a,b])=>[a,b.trim()]));const miss=need(k).filter(x=>!n[x]);
-if(miss.length)return alert("حقول أساسية ناقصة: "+miss.map(m=>FIELDS[k].find(f=>f[0]==m)[1]).join("، "));
-if(db[k].some(x=>x.id!=id&&dupKey(k,x)==dupKey(k,n))&&!confirm("يوجد سجل مكرر بنفس البيانات الأساسية. حفظ على أي حال؟"))return;
-if(!n.source&&!confirm("لا يوجد مصدر. سيُعرض السجل كغير مؤكد. متابعة؟"))return;
-snap();n.updated=new Date().toISOString().slice(0,10);if(id)Object.assign(r,n),delete r.demo;else db[k].push({id:uid(),...n});save();location.hash="#/admin"}}
-function snap(){const b=S.get("mr_bak",[]);b.unshift({t:new Date().toISOString(),db});S.set("mr_bak",b.slice(0,5))}
+$("#f").oninput=()=>dirty=true;$("#f").onsubmit=ev=>{ev.preventDefault();const bt=ev.submitter;if(bt.disabled)return;bt.disabled=true;const fail=()=>{bt.disabled=false};const n=Object.fromEntries([...new FormData(ev.target)].map(([a,b])=>[a,b.trim()]));const miss=need(k).filter(x=>!n[x]);
+if(miss.length){fail();return alert("حقول أساسية ناقصة: "+miss.map(m=>FIELDS[k].find(f=>f[0]==m)[1]).join("، "))}
+if(db[k].some(x=>x.id!=id&&dupKey(k,x)==dupKey(k,n))&&!confirm("يوجد سجل مكرر بنفس البيانات الأساسية. حفظ على أي حال؟")){fail();return}
+if(!n.source&&!confirm("لا يوجد مصدر. سيُعرض السجل كغير مؤكد. متابعة؟")){fail();return}
+snap();n.updated=MR.today();if(!commit(d=>{if(id){const t=d[k].find(x=>x.id==id);Object.assign(t,n);delete t.demo}else d[k].push({id:MR.uid(),...n})})){fail();return}dirty=false;location.hash="#/admin"}}
+function snap(){const b=S.get("mr_bak",[]);b.unshift({t:new Date().toISOString(),db:JSON.parse(JSON.stringify(db))});return S.set("mr_bak",b.slice(0,5))}
 const sha=async s=>[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)))].map(b=>b.toString(16).padStart(2,"0")).join("");
 async function adminPage(){if(!crypto.subtle)return app.innerHTML='<div class="warn">الإدارة تتطلب اتصالًا آمنًا (HTTPS).</div>';
 const cred=S.get("mr_adm",null);
@@ -104,28 +100,29 @@ if(!cred){const salt=uid()+uid();S.set("mr_adm",{salt,h:await sha(salt+p)});admi
 const bak=S.get("mr_bak",[]);
 app.innerHTML=`<h2>الإدارة</h2><div class="row"><a class="btn" href="#/new/faults" style="text-align:center">+ عطل</a><a class="btn" href="#/new/comps" style="text-align:center">+ كباس</a></div>
 <h2>استيراد (JSON أو CSV)</h2><select id="ik"><option value="faults">أعطال</option><option value="comps">كباسات</option></select><input id="fi" type="file" accept=".json,.csv"><div id="rep"></div>
-<h2>تصدير</h2><div class="row"><button class="alt" data-x="faults.json">أعطال JSON</button><button class="alt" data-x="faults.csv">أعطال CSV</button><button class="alt" data-x="comps.json">كباسات JSON</button><button class="alt" data-x="comps.csv">كباسات CSV</button><button class="alt" data-x="all.json">نسخة كاملة</button></div>
+<h2>تصدير</h2><div class="row"><button class="alt" data-x="faults.json">أعطال JSON</button><button class="alt" data-x="faults.csv">أعطال CSV</button><button class="alt" data-x="comps.json">كباسات JSON</button><button class="alt" data-x="comps.csv">كباسات CSV</button><button class="alt" data-x="all.json">نسخة كاملة</button></div><h2>استعادة من ملف نسخة</h2><input id="rf" type="file" accept=".json"><div id="rrep"></div>
 <h2>نسخ احتياطي</h2><div class="row"><button id="bk" class="alt">نسخة الآن</button></div>${bak.map((b,i)=>`<div class="it">${e(b.t.slice(0,16).replace("T"," "))} — ${b.db.faults.length} عطل / ${b.db.comps.length} كباس <button data-r="${i}" class="alt">استعادة</button></div>`).join("")}
 <div class="row"><button id="dd" class="alt">فحص التكرار</button><button id="dm" class="alt">حذف السجلات التجريبية</button><button id="lo" class="alt">خروج</button></div><div id="out"></div>`;
-$("#fi").onchange=async ev=>{const f=ev.target.files[0];if(!f)return;const k=$("#ik").value,txt=await f.text();let rows=[];
-try{rows=f.name.endsWith(".json")?(()=>{const j=JSON.parse(txt);return Array.isArray(j)?j:j[k]||[]})():csv(txt)}catch(x){return $("#rep").innerHTML='<div class="warn">ملف غير صالح: '+e(x.message)+"</div>"}
-snap();let ok=0,dup=[],err=[];const keys=new Set(db[k].map(r=>dupKey(k,r)));
-rows.forEach((r,i)=>{const n={};FIELDS[k].forEach(([x])=>{if(r[x]!=null&&r[x]!=="")n[x]=String(r[x]).trim()});const m=need(k).filter(x=>!n[x]);
-if(m.length)return err.push(`سطر ${i+1}: ينقص ${m.join("، ")}`);const dk=dupKey(k,n);if(keys.has(dk))return dup.push(`سطر ${i+1}`);keys.add(dk);n.id=uid();n.updated=new Date().toISOString().slice(0,10);db[k].push(n);ok++});
-save();$("#rep").innerHTML=`<div class="warn">تم استيراد ${ok} · مكرر ${dup.length} · أخطاء ${err.length}<br>${[...dup.map(d=>d+": مكرر"),...err].map(e).join("<br>")}</div>`};
-document.querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{const n=b.dataset.x,[k,x]=n.split(".");const d=k=="all"?db:db[k];dl(n,x=="json"?JSON.stringify(d,null,1):toCsv(k,d),x=="json"?"application/json":"text/csv")});
+$("#fi").onchange=async ev=>{const f=ev.target.files[0];if(!f)return;const k=$("#ik").value,txt=await f.text(),bad=checkFile(f.name,f.size,txt),R=$("#rep");
+if(bad)return R.innerHTML='<div class="warn">'+e(bad)+"</div>";let rows;
+try{rows=/\.json$/i.test(f.name)?(j=>Array.isArray(j)?j:j&&j[k])(JSON.parse(txt)):csv(txt)}catch(x){return R.innerHTML='<div class="warn">ملف تالف: '+e(x.message)+"</div>"}
+const p=planImport(db,k,rows);if(!p.next)return R.innerHTML='<div class="warn">'+e(p.err[0])+"</div>";
+R.innerHTML=`<div class="warn">معاينة: سيُضاف ${p.acc.length} · مكرر ${p.dup.length} · مرفوض ${p.err.length}<br>${[...p.dup.map(d=>d+": مكرر"),...p.err].slice(0,30).map(e).join("<br>")}${p.err.length?"<br><b>لن يُستورد شيء إلا بعد تأكيدك؛ المرفوض لن يُضاف.</b>":""}</div>${p.acc.length?'<div class="row"><button id="okimp">اعتماد الاستيراد</button></div>':""}`;
+if(p.acc.length)$("#okimp").onclick=ev2=>{ev2.target.disabled=true;snap();if(commit(d=>{d[k]=d[k].concat(p.acc)}))R.innerHTML=`<div class="warn">تم استيراد ${p.acc.length} سجل.</div>`;else ev2.target.disabled=false}};
+document.querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{const n=b.dataset.x,[k,x]=n.split(".");const d=k=="all"?db:db[k];dl(n,x=="json"?JSON.stringify(k=="all"?makeBackup(db,{favorites:S.get("mr_fv",[]),history:S.get("mr_rs",[])}):d,null,1):toCsv(k,d),x=="json"?"application/json":"text/csv")});
 $("#bk").onclick=()=>{snap();adminPage()};
-document.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>{if(confirm("استعادة هذه النسخة؟ (تؤخذ نسخة من الحالة الحالية أولًا)")){const x=bak[b.dataset.r].db;snap();db=x;save();adminPage()}});
+const restore=(x,src)=>{const v=validateBackup(x);if(!v.ok)return alert("نسخة مرفوضة: "+v.reason);
+if(!confirm(`${src}\nستُستبدل البيانات الحالية (${db.faults.length} عطل / ${db.comps.length} كباس) بـ ${v.summary.faults} عطل / ${v.summary.comps} كباس. تؤخذ نسخة من الحالة الحالية أولًا. متابعة؟`))return;
+if(!snap()&&!confirm("تعذر أخذ نسخة من الحالة الحالية. متابعة؟"))return;if(commit(d=>{d.faults=v.data.faults;d.comps=v.data.comps}))adminPage()};
+document.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>restore(makeBackup(bak[b.dataset.r].db),"نسخة محلية"));
+$("#rf").onchange=async ev=>{const f=ev.target.files[0];if(!f)return;const t=await f.text(),bad=checkFile(f.name,f.size,t);if(bad)return alert(bad);let o;try{o=JSON.parse(t)}catch{return alert("نسخة مرفوضة: JSON تالف")}restore(o,"ملف: "+f.name)};
 $("#dd").onclick=()=>{let o="";for(const k of["faults","comps"]){const m={};db[k].forEach(r=>(m[dupKey(k,r)]??=[]).push(r));Object.values(m).filter(a=>a.length>1).forEach(a=>o+=`<div class="it">${k}: ${e(a.map(r=>r.code||r.model).join(" / "))} (${a.length})</div>`)}$("#out").innerHTML=o||'<div class="it">لا تكرار</div>'};
 $("#dm").onclick=()=>{if(confirm("حذف كل السجلات التجريبية؟")){snap();for(const k of["faults","comps"])db[k]=db[k].filter(r=>!r.demo);save();adminPage()}};
 $("#lo").onclick=()=>{admin=false;location.hash="#/"}}
-function csv(t){const rows=[];let r=[],c="",q=false;t=t.replace(/^\uFEFF/,"");for(let i=0;i<t.length;i++){const ch=t[i];if(q){if(ch=='"'){t[i+1]=='"'?(c+='"',i++):q=false}else c+=ch}else if(ch=='"')q=true;else if(ch==","){r.push(c);c=""}else if(ch=="\n"||ch=="\r"){if(ch=="\r"&&t[i+1]=="\n")i++;r.push(c);rows.push(r);r=[];c=""}else c+=ch}if(c||r.length){r.push(c);rows.push(r)}
-const h=rows.shift().map(x=>x.trim());return rows.filter(a=>a.some(x=>x.trim())).map(a=>Object.fromEntries(h.map((x,i)=>[x,a[i]])))}
-const toCsv=(k,d)=>{const fs=FIELDS[k].map(f=>f[0]);return "\uFEFF"+[fs.join(","),...d.map(r=>fs.map(f=>'"'+String(r[f]??"").replace(/"/g,'""')+'"').join(","))].join("\r\n")};
 function dl(n,c,m){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([c],{type:m+";charset=utf-8"}));a.download=n;a.click()}
 function settings(){const nets=navigator.onLine?"متصل":"غير متصل";app.innerHTML=`<h2>الإعدادات</h2><div class="it">الحالة: ${nets}<br><span class="mu">البيانات محفوظة على هذا الجهاز وتعمل دون إنترنت. آخر تعديل لأحدث سجل: ${e(db.faults.concat(db.comps).map(r=>r.updated||"").sort().pop()||"—")}</span></div><div class="row"><button class="alt" id="cr">مسح سجل البحث والمشاهدة</button></div>`;$("#cr").onclick=()=>{["mr_rs","mr_rv"].forEach(k=>localStorage.removeItem(k));alert("تم")}}
 function route(){const h=location.hash.slice(2).split("/");scrollTo(0,0);
 ({"":home,faults:()=>list("faults"),comps:()=>list("comps"),f:()=>detail("faults",h[1]),c:()=>detail("comps",h[1]),cmp:()=>cmp(h[1]),admin:adminPage,new:()=>form(h[1]),edit:()=>form(h[1],h[2]),settings}[h[0]]||home)()}
-addEventListener("hashchange",route);route();
+addEventListener("hashchange",()=>{if(dirty&&!confirm("لديك تعديلات غير محفوظة. تجاهلها؟")){history.replaceState(null,"",cur);return}dirty=false;cur=location.hash;route()});addEventListener("beforeunload",ev=>{if(dirty){ev.preventDefault();ev.returnValue=""}});route();
 if("serviceWorker"in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script></body></html>
