@@ -1,31 +1,15 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#16303a">
-<link rel="manifest" href="manifest.webmanifest"><title>المرجع الفني | أكواد الأعطال والكباسات</title>
-<style>
-:root{--ink:#16303a;--bg:#eef2f1;--card:#fff;--ac:#e8a317;--tx:#1b2428;--mu:#5b6b72;--ln:#d3dcdb;--bad:#b3261e;--ok:#1f7a4d}
-@media(prefers-color-scheme:dark){:root{--bg:#0f1a1e;--card:#18262c;--tx:#e7eeee;--mu:#9bb0b5;--ln:#2b3d44}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.6 Tajawal,"Noto Naskh Arabic",system-ui,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
-header{background:var(--ink);color:#fff;padding:14px 16px;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:5}
-header a{color:#fff;text-decoration:none;font-weight:700;flex:1}header .lg{width:34px;height:34px;border:3px solid var(--ac);border-radius:50%;display:grid;place-items:center;color:var(--ac);font-weight:800}
-main{max-width:760px;margin:auto;padding:14px}
-input,select,textarea,button{font:inherit;color:inherit}
-input,select,textarea{width:100%;padding:12px;border:1.5px solid var(--ln);border-radius:10px;background:var(--card)}
-button,.btn{background:var(--ink);color:#fff;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;min-height:44px;text-decoration:none;display:inline-block}
-button.alt{background:transparent;color:var(--tx);border:1.5px solid var(--ln)}button.bad{background:var(--bad)}
-.big{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
-.big a{background:var(--ink);color:#fff;border-radius:16px;padding:22px 12px;text-decoration:none;font-weight:800;font-size:1.15rem;text-align:center;border-bottom:5px solid var(--ac)}
-.big small{display:block;font-weight:400;opacity:.8}
-.it{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:12px;margin:8px 0;display:block;color:inherit;text-decoration:none}
-.it b{font-size:1.05rem}.mu{color:var(--mu);font-size:.9rem}
-.tag{display:inline-block;padding:1px 9px;border-radius:99px;font-size:.78rem;background:var(--ln);margin-inline-end:4px}
-.warn{background:#fff4d6;color:#5a4300;border-inline-start:5px solid var(--ac);padding:10px 12px;border-radius:8px;margin:10px 0}
-.row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.row>*{flex:1}
-h2{margin:18px 0 6px;font-size:1.1rem}.chips button{padding:6px 12px;min-height:34px;margin:2px}
-dl{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:6px 12px}dt{color:var(--mu);font-size:.85rem;margin-top:8px}dd{margin:0 0 6px;white-space:pre-wrap}
-table{width:100%;border-collapse:collapse;background:var(--card);font-size:.9rem}td,th{border:1px solid var(--ln);padding:6px;vertical-align:top}.df{background:#fff4d6;color:#3b2d00}
-label{display:block;margin-top:10px;font-size:.9rem;color:var(--mu)}
-.fav{font-size:1.3rem;background:none;color:inherit;padding:4px 10px;min-height:0}.tabs{display:flex;gap:6px;margin:10px 0}.tabs a{flex:1;text-align:center;padding:8px;border-radius:10px;border:1.5px solid var(--ln);text-decoration:none;color:inherit}.tabs a.on{background:var(--ink);color:#fff}dd,.it{overflow-wrap:anywhere}</style></head><body>
-<header><div class="lg">م</div><a href="#/">المرجع الفني</a><a href="#/admin" style="flex:0">⚙</a></header>
-<main id="app"></main>
-<script src="core.js"></script><script src="sync.js"></script><script src="app.js"></script>
-</body></html>
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><script>try{var m=JSON.parse(localStorage.getItem("mw_theme")||"{}"),d=m.mode=="dark"||(m.mode!="light"&&matchMedia("(prefers-color-scheme: dark)").matches);if(d)document.documentElement.setAttribute("data-theme","dark");document.documentElement.style.colorScheme=d?"dark":"light"}catch(e){}</script>
+<meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#001b4d"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" type="image/svg+xml" href="app-icon.svg"><link rel="apple-touch-icon" href="apple-touch-icon-v13.png">
+<title>المرجع الفني | الورشة الفنية</title><link rel="stylesheet" href="style.css"><style>
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.row>*{flex:1;text-align:center}.chips{display:flex;flex-wrap:wrap;gap:6px}.chips button{flex:none}
+.tabs{display:flex;gap:6px;margin:10px 0}.tabs a{flex:1;text-align:center;padding:9px;border-radius:9px;background:var(--bg-sunken);color:var(--text);text-decoration:none;font-weight:bold}.tabs a.on{background:var(--wl-primary,#17324d);color:#fff}
+a.item{display:block;color:inherit;text-decoration:none}.mu{color:var(--text-muted);font-size:13px}.item,dd{overflow-wrap:anywhere}
+.tag{display:inline-block;padding:1px 9px;border-radius:99px;font-size:12px;background:var(--bg-sunken);color:var(--text-muted);margin-inline-end:4px}
+dl{background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:6px 12px}dt{color:var(--text-muted);font-size:13px;margin-top:8px}dd{margin:0 0 6px;white-space:pre-wrap}
+table{width:100%;border-collapse:collapse;background:var(--bg-elevated);font-size:14px}td,th{border:1px solid var(--border);padding:6px;vertical-align:top}.df{background:#fff3cd;color:#3b2d00}
+label{display:block;margin-top:10px}.page-topbar{display:flex;align-items:center;justify-content:space-between}.wl-acts .theme-toggle-btn{background:var(--bg-sunken);color:var(--text)}
+#gs{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:flex;justify-content:center}.gs-box{background:var(--bg);width:100%;max-width:700px;height:100%;overflow:auto;padding:12px}.gs-head{display:flex;gap:8px;position:sticky;top:0;background:var(--bg);padding-bottom:8px}.gs-head input{flex:1}
+#top>.page-topbar,#top>.page-head{max-width:950px;margin:0 auto;padding:12px 16px 0}#top>.page-head{padding-top:4px}
+footer{text-align:center;margin:20px 0 14px;font-size:12px;color:var(--text-muted)}
+</style></head><body><div id="top"></div><main class="page" id="app"></main><footer>الورشة الفنية — <span class="owner-name"></span> · المرجع الفني</footer>
+<script src="core.js"></script><script src="sync.js"></script><script src="brand.js"></script><script src="app.js"></script></body></html>
