@@ -3,7 +3,7 @@
 const normAr=v=>String(v??"").toLowerCase().normalize("NFKC").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[أإآ]/g,"ا").replace(/ة/g,"ه").replace(/ـ/g,"").replace(/[٠-٩]/g,d=>String(d.charCodeAt(0)-0x0660)).replace(/[۰-۹]/g,d=>String(d.charCodeAt(0)-0x06F0)).replace(/[\s\-_./\\]+/g,"").trim();
 const T=(v,n=5000)=>String(v??"").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,"").trim().slice(0,n);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8),now=()=>new Date().toISOString();
-const FK=["deviceType","brand","category","model","code","title","cause","fix","note","addedBy","ref","reviewedAt"],TK=["deviceType","brand","category","model","title","enter","tests","exit","note","ref","reviewedAt"];
+const FK=["deviceType","brand","category","model","code","title","cause","fix","note","addedBy"],TK=["deviceType","brand","category","model","title","enter","tests","exit","note"];
 const CK=["hp","refrigerant","btu","kcal","application","run_capacitor","start_capacitor","oil_qty","oil_unit","amp","watt","freq","displacement","rpm","notes"];
 const isObj=o=>o&&typeof o=="object"&&!Array.isArray(o);
 function cleanFault(raw){if(!isObj(raw))return null;const test=raw.kind==="test",n={};(test?TK:FK).forEach(k=>{const v=T(raw[k]);if(v)n[k]=v});if(test)n.kind="test";
@@ -32,5 +32,22 @@ if(!Array.isArray(o.faults)||!Array.isArray(o.custom))return{ok:false,reason:"ب
 for(const [i,r] of o.faults.entries()){const n=cleanFault(r);if(!n)return{ok:false,reason:"سجل عطل تالف رقم "+(i+1)};faults.push({id:ID(r.id),...n,source:T(r.source,20),createdAt:T(r.createdAt,40),updatedAt:T(r.updatedAt,40)})}
 for(const [i,c] of o.custom.entries()){const rec=cleanRec(c&&c.rec);if(!rec||!T(c.brand))return{ok:false,reason:"إضافة كباس تالفة رقم "+(i+1)};custom.push({id:ID(c.id),brand:T(c.brand,100),rec,addedAt:T(c.addedAt,40)})}
 return{ok:true,data:{faults,custom},summary:{faults:faults.length,custom:custom.length,created:o.created}}}
-const api={normAr,cleanFault,faultKey,parseFaults,planFaults,exportFaults,cleanRec,planComps,parseComps,exportComps,makeBackup,validateBackup,FK,TK,CK};
+
+/* بدائل الكباسات: مطابقة بالبيانات المتاحة (نفس الفريون والتطبيق والتردد وقدرة تبريد متقاربة) */
+const refN=v=>{const s=String(v??"").toUpperCase().replace(/[\s\-]/g,"");return /^R\d{2,4}[A-Z]?$/.test(s)?s:""};
+const appN=v=>{const s=String(v??"").toUpperCase().replace(/\s/g,"");return /^[A-Z\/]{2,6}$/.test(s)?s:""};
+const num=v=>typeof v=="number"&&isFinite(v)?v:(typeof v=="string"&&/^\d+(\.\d+)?$/.test(v.trim())?parseFloat(v):null);
+const capOf=r=>{const k=num(r.kcal);if(k)return k;const b=num(r.btu);return b?b/3.968:null};
+const near=(a,b,t)=>a==null||b==null||Math.abs(a-b)<=t*Math.max(a,b);
+const both=(a,b)=>a!=null&&b!=null;
+const altKey=r=>{const f=refN(r.refrigerant),c=capOf(r);return f&&c?f+"|"+appN(r.application)+"|"+(num(r.freq)||""):null};
+function buildAltIndex(rows){const m=new Map();rows.forEach((x,i)=>{const k=altKey(x.r);if(k){if(!m.has(k))m.set(k,[]);m.get(k).push(i)}});return m}
+function alts(idx,rows,i,max=30){const s=rows[i].r,k=altKey(s);if(!k)return{total:0,list:[]};const c=capOf(s),out=[];
+for(const j of idx.get(k)||[]){if(j===i)continue;const t=rows[j].r;if(rows[j].b===rows[i].b&&t.model===s.model)continue;const c2=capOf(t);if(!near(c,c2,.04))continue;
+if(s.hp&&t.hp&&String(s.hp).trim()!==String(t.hp).trim())continue;if(!near(num(s.amp),num(t.amp),.12))continue;if(!near(num(s.displacement),num(t.displacement),.05))continue;
+const vs=normAr(s.voltage_frequency),vt=normAr(t.voltage_frequency);if(vs&&vt&&vs!==vt)continue;if(s.phase&&t.phase&&normAr(s.phase)!==normAr(t.phase))continue;
+const v=(both(num(s.amp),num(t.amp))?1:0)+(both(num(s.displacement),num(t.displacement))?1:0)+(s.hp&&t.hp?1:0)+(vs&&vt?1:0);
+out.push({j,v,d:Math.abs(c-c2)/c})}
+out.sort((a,b)=>b.v-a.v||a.d-b.d);return{total:out.length,list:out.slice(0,max).map(o=>o.j)}}
+const api={refN,capOf,altKey,buildAltIndex,alts,normAr,cleanFault,faultKey,parseFaults,planFaults,exportFaults,cleanRec,planComps,parseComps,exportComps,makeBackup,validateBackup,FK,TK,CK};
 if(typeof module!="undefined")module.exports=api;else g.SY=api})(typeof window!="undefined"?window:globalThis);
