@@ -16,24 +16,53 @@ let bp=null,CL=null;
 const base=()=>bp||(bp=new Promise((ok,no)=>{const s=document.createElement("script");s.src="compressors-base.js";s.onload=()=>ok(window.COMPRESSOR_DB_BRANDS||{});s.onerror=()=>{bp=null;no(new Error("تعذر تحميل قاعدة الكباسات"))};document.head.appendChild(s)}));
 async function comps(){const B=await base();if(!CL){CL=[];for(const [b,rows] of Object.entries(B))rows.forEach(r=>CL.push({b,r,n:N(b+" "+r.model),base:1}))}return CL.concat(D.custom.map(c=>({b:c.brand,r:c.rec,n:N(c.brand+" "+c.rec.model),cid:c.id})))}
 /* ---- عناصر عرض ---- */
-const fitem=r=>`<a class="item" href="#/fault/${e(r.id)}"><b>${r.kind=="test"?"تيست مود: "+e(r.title):`<span dir="ltr">${e(r.code)}</span> — ${e(r.title)}`}</b><div class="mu">${e(r.deviceType)} · ${e(r.brand||"كل الماركات")} ${e(r.model||"")}</div></a>`;
+const fitem=r=>{const isTest=r.kind=="test";const code=isTest?"":e(r.code);const title=e(r.title||"");
+return`<a class="result-card" href="#/fault/${e(r.id)}"><div class="rc-top">${isTest?`<span class="badge badge-info">تيست مود</span>`:`<span class="rc-code" dir="ltr">${code}</span>`}<span class="tag">${e(r.deviceType||"")}</span></div>${title?`<div class="rc-title">${isTest?"تيست مود: ":""}${title}</div>`:""}<div class="rc-meta"><span class="mu">${e(r.brand||"كل الماركات")}${r.model?" · "+e(r.model):""}</span></div></a>`};
 let AX=null,AXk="";
 const altsFor=(A,i,max)=>{const k=A.length+":"+D.custom.map(c=>c.id).join();if(!AX||AXk!=k){AX=Y.buildAltIndex(A);AXk=k}return Y.alts(AX,A,i,max)};
 const capTxt=r=>[r.kcal!=null?r.kcal+" Kcal":(r.btu!=null?r.btu+" BTU":""),r.amp!=null?r.amp+"A":""].filter(Boolean).join(" · ");
 const altBox=(A,i,full)=>{const a=altsFor(A,i,full?30:3);if(!a.total)return full?'<div class="alt-box">🔁 لا توجد بدائل مطابقة في البيانات المتاحة.</div>':"";
 return `<div class="alt-box"><b>🔁 بدائل (${a.total})</b>${full?'<small class="mu">نفس الفريون والتطبيق والتردد وقدرة تبريد متقاربة</small>':""}${a.list.map(j=>`<a href="#/comp/${j}" dir="ltr"><span>${e(A[j].r.model)}</span><small>${full?e(A[j].b)+" · ":""}${e(full?capTxt(A[j].r):(A[j].r.kcal!=null?A[j].r.kcal+" Kcal":capTxt(A[j].r)))}</small></a>`).join("")}${a.total>a.list.length?`<small>+${a.total-a.list.length} أخرى</small>`:""}</div>`};
-const citem=(x,i,A)=>`<div class="item" style="display:flex;gap:8px;align-items:flex-start"><label style="margin:0;display:flex;gap:8px;align-items:center;color:inherit;flex:1;min-width:0"><input type="checkbox" class="cmp" value="${i}" style="width:22px;height:22px;flex:none"><a href="#/comp/${i}" style="color:inherit;text-decoration:none;flex:1;min-width:0"><b dir="ltr">${e(x.r.model)}</b><div class="mu">${e(x.b)} · ${e(x.r.refrigerant||"")} ${e(x.r.hp?x.r.hp+" HP":"")}</div></a></label>${altBox(A,i,0)}</div>`
+const citem=(x,i,A)=>{const r=x.r;const chips=[];
+if(r.hp)chips.push(`<span class="spec-chip em">${e(String(r.hp))} HP</span>`);
+if(r.kcal!=null)chips.push(`<span class="spec-chip">${e(String(r.kcal))} Kcal</span>`);
+else if(r.btu!=null)chips.push(`<span class="spec-chip">${e(String(r.btu))} BTU</span>`);
+if(r.refrigerant)chips.push(`<span class="spec-chip">${e(String(r.refrigerant))}</span>`);
+if(r.amp!=null)chips.push(`<span class="spec-chip">${e(String(r.amp))} A</span>`);
+return`<div class="comp-row"><label><input type="checkbox" class="cmp" value="${i}"><a href="#/comp/${i}"><span class="rc-model" dir="ltr">${e(r.model)}</span><div class="mu">${e(x.b)}${r.application?" · "+e(r.application):""}</div>${chips.length?`<div class="rc-specs">${chips.join("")}</div>`:""}</a></label>${altBox(A,i,0)}</div>`};
 const recs=(o,keys)=>keys.filter(k=>o[k]!=null&&o[k]!=="").map(k=>`<dt>${LB[k]||k}</dt><dd>${/^https?:\/\//.test(o[k])?`<a href="${e(o[k])}" target="_blank" rel="noopener noreferrer">${e(o[k])}</a>`:e(o[k])}</dd>`).join("");
 const favBtn=(k,id,t,h)=>{const on=S.get("mw_fav",[]).some(x=>x.k==k&&x.id==id);return`<button class="secondary" id="fv">${on?"★ في المفضلة":"☆ إضافة للمفضلة"}</button>`};
 function wireFav(k,id,t,h,redraw){$("#fv").onclick=()=>{let a=S.get("mw_fav",[]).filter(x=>!(x.k==k&&x.id==id));if(!$("#fv").textContent.includes("★"))a.unshift({k,id,t,h});S.set("mw_fav",a);redraw()}}
-const copy=txt=>navigator.clipboard.writeText(txt).then(()=>alert("تم النسخ"),()=>alert("تعذر النسخ"));
+
+const toast=m=>{const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),1800)};
+const copy=txt=>navigator.clipboard.writeText(txt).then(()=>toast("تم النسخ"),()=>toast("تعذر النسخ"));
+
 const fav=()=>{const f=S.get("mw_fav",[]),r=S.get("mw_rv",[]);return(f.length?`<h2>المفضلة</h2>`+f.map(x=>`<a class="item" href="${e(x.h)}">${e(x.t)}</a>`).join(""):"")+(r.length?`<h2>شاهدتها مؤخرًا</h2>`+r.map(x=>`<a class="item" href="${e(x.h)}">${e(x.t)}</a>`).join(""):"")};
 /* ---- الصفحات ---- */
-function home(){const rs=S.get("mw_rs",[]);app.innerHTML=(S.ok?"":warn("التخزين المحلي غير متاح: لن تُحفظ التغييرات."))+`<button class="secondary" data-act="search" style="width:100%;padding:13px;font-size:15px;margin-top:6px">🔍 بحث عام في الأعطال والكباسات</button>
-<div class="grid"><div class="nav-section-title">📚 مرجع فني</div><a class="card card-accent-purple" href="#/faults"><i>🧯</i><div class="card-text"><b>أكواد الأعطال والتيست مود</b><span>${D.faults.length} سجل — أكواد الأعطال وطرق التيست مود لكل نوع وماركة</span></div></a><a class="card card-accent-blue" href="#/comps"><i>🧊</i><div class="card-text"><b>أكواد الكباسات (القدرات)</b><span>بحث بالموديل عن القدرة والأمبير والفريون — قاعدة مرجعية + إضافاتك</span></div></a>
-<div class="nav-section-title">⚙️ الإدارة والهوية</div><a class="card card-accent-green" href="#/admin"><i>🗂️</i><div class="card-text"><b>استيراد وتصدير ونسخ احتياطي</b><span>بصيغة نظام الورشة الفنية</span></div></a><a class="card card-accent-blue" href="#/settings"><i>🎨</i><div class="card-text"><b>المظهر والألوان</b><span>ليلي / نهاري وتغيير الألوان واسم الهوية</span></div></a></div>
-${rs.length?`<h2>آخر عمليات البحث</h2><div class="chips">${rs.map(x=>`<button class="secondary" data-gq="${e(x.q)}">${e(x.q)}</button>`).join("")}</div>`:""}${fav()}`;
-document.querySelectorAll("[data-gq]").forEach(b=>b.onclick=()=>openSearch(b.dataset.gq))}
+function home(){
+const rs=S.get("mw_rs",[]),fv=S.get("mw_fav",[]),rv=S.get("mw_rv",[]);
+app.innerHTML=(S.ok?"":warn("التخزين المحلي غير متاح: لن تُحفظ التغييرات."))+
+`<button class="home-search" data-act="search" type="button"><span class="ico">🔍</span><span>بحث سريع: كود عطل، موديل كباس، ماركة…</span></button>
+<div class="quick-bar">
+<a href="#/faults">🧯 أكواد الأعطال</a>
+<a href="#/comps">🧊 الكباسات</a>
+${fv.length?`<a href="#/" data-scroll="fav">★ المفضلة (${fv.length})</a>`:""}
+${rv.length?`<a href="#/" data-scroll="hist">⏱ الأخير</a>`:""}
+<a href="#/admin">🗂️ إدارة</a>
+</div>
+<div class="grid">
+<div class="nav-section-title">📚 المرجع الفني</div>
+<a class="card card-accent-purple" href="#/faults"><i>🧯</i><div class="card-text"><b>أكواد الأعطال والتيست مود</b><span>${D.faults.length} سجل — أكواد الأعطال وطرق التيست مود</span></div></a>
+<a class="card card-accent-blue" href="#/comps"><i>🧊</i><div class="card-text"><b>قاعدة الكباسات</b><span>بحث بالموديل عن القدرة والأمبير والفريون</span></div></a>
+<div class="nav-section-title">⚙️ الإعدادات</div>
+<a class="card card-accent-green" href="#/admin"><i>🗂️</i><div class="card-text"><b>استيراد وتصدير</b><span>نسخ احتياطي بصيغة نظام الورشة</span></div></a>
+<a class="card card-accent-cyan" href="#/settings"><i>🎨</i><div class="card-text"><b>المظهر والألوان</b><span>ليلي / نهاري وتخصيص الهوية</span></div></a>
+</div>
+${rs.length?`<h2>آخر عمليات البحث</h2><div class="chips">${rs.map(x=>`<button class="secondary" data-gq="${e(x.q)}">${e(x.q)}</button>`).join("")}</div>`:""}
+${fv.length?`<h2 id="fav">المفضلة</h2>`+fv.map(x=>`<a class="result-card" href="${e(x.h)}"><div class="rc-title">★ ${e(x.t)}</div></a>`).join(""):""}
+${rv.length?`<h2 id="hist">شاهدتها مؤخرًا</h2>`+rv.map(x=>`<a class="result-card" href="${e(x.h)}"><div class="rc-title">${e(x.t)}</div></a>`).join(""):""}`;
+document.querySelectorAll("[data-gq]").forEach(b=>b.onclick=()=>openSearch(b.dataset.gq));
+}
 /* ---- البحث العام ---- */
 let gt=0;
 function openSearch(q0=""){if($("#gs"))return;const o=document.createElement("div");o.id="gs";o.innerHTML=`<div class="gs-box"><div class="gs-head"><input id="gsq" type="search" placeholder="🔍 كود عطل، موديل كباس، ماركة…" autocomplete="off"><button class="secondary" id="gsx" type="button" style="flex:none">إغلاق</button></div><div id="gsr"><div class="hint">اكتب حرفين على الأقل. يشمل الأعطال والتيست مود والكباسات.</div></div></div>`;document.body.appendChild(o);
@@ -41,37 +70,115 @@ const close=()=>{const v=$("#gsq").value.trim();if(v.length>1)hi("mw_rs",{q:v});
 let tm;const run=async()=>{const q=N($("#gsq").value),id=++gt;if(q.length<2){$("#gsr").innerHTML='<div class="hint">اكتب حرفين على الأقل.</div>';return}
 const fa=D.faults.filter(x=>N(Y.FK.concat(Y.TK).map(k=>x[k]).join(" ")).includes(q)),ft=fa.filter(x=>x.kind!="test"),tt=fa.filter(x=>x.kind=="test");
 const part=(t,a)=>a.length?`<h2>${t} (${a.length})</h2>`:"";$("#gsr").innerHTML=part("🧯 أكواد الأعطال",ft)+ft.slice(0,8).map(fitem).join("")+part("🧯 تيست مود",tt)+tt.slice(0,8).map(fitem).join("")+'<div class="hint" id="gsc">جارٍ البحث في الكباسات…</div>';
-try{const A=await comps();if(id!==gt)return;const out=[];let n=0;for(let i=0;i<A.length;i++){if(A[i].n.includes(q)){n++;if(out.length<8)out.push(`<a class="item" href="#/comp/${i}"><b dir="ltr">${e(A[i].r.model)}</b><div class="mu">${e(A[i].b)} · ${e(A[i].r.refrigerant||"")} ${e(A[i].r.hp?A[i].r.hp+" HP":"")}</div></a>`)}}
-const el=$("#gsc");if(el)el.outerHTML=(n?`<h2>🧊 الكباسات (${n})</h2>`+out.join("")+(n>8?`<a class="item" href="#/comps/${encodeURIComponent($("#gsq").value.trim())}">عرض كل نتائج الكباسات ◂</a>`:""):"")+(!fa.length&&!n?'<div class="item mu">لا توجد نتائج.</div>':"")}catch{const el=$("#gsc");if(el)el.textContent="تعذر تحميل قاعدة الكباسات."}};
+try{const A=await comps();if(id!==gt)return;const out=[];let n=0;for(let i=0;i<A.length;i++){if(A[i].n.includes(q)){n++;if(out.length<8)out.push(`<a class="result-card" href="#/comp/${i}"><div class="rc-model" dir="ltr">${e(A[i].r.model)}</div><div class="mu">${e(A[i].b)} · ${e(A[i].r.refrigerant||"")} ${e(A[i].r.hp?A[i].r.hp+" HP":"")}</div></a>`)}}
+const el=$("#gsc");if(el)el.outerHTML=(n?`<h2>🧊 الكباسات (${n})</h2>`+out.join("")+(n>8?`<a class="item" href="#/comps/${encodeURIComponent($("#gsq").value.trim())}">عرض كل نتائج الكباسات ◂</a>`:""):"")+(!fa.length&&!n?'<div class="empty-state"><div class="icon">🔍</div>لا توجد نتائج. جرّب جزءًا من الكود أو الموديل.</div>':"")}catch{const el=$("#gsc");if(el)el.textContent="تعذر تحميل قاعدة الكباسات."}};
 $("#gsq").oninput=()=>{clearTimeout(tm);tm=setTimeout(run,150)};$("#gsq").value=q0;$("#gsq").focus();if(q0)run()}
 document.addEventListener("click",ev=>{const b=ev.target.closest("[data-act]");if(!b)return;if(b.dataset.act=="search")openSearch();else if(b.dataset.act=="theme")BR.toggle()});
 function faults(kind="code"){const uq=a=>[...new Set(D.faults.map(r=>r[a]).filter(Boolean))].sort(),test=kind=="test";
 app.innerHTML=`<div class="tabs"><a href="#/faults" class="${test?"":"on"}">أكواد الأعطال</a><a href="#/tests" class="${test?"on":""}">تيست مود</a></div><input id="q" type="search" placeholder="بحث بالكود أو الوصف أو الموديل…" autocomplete="off">
 <div class="row"><select id="a"><option value="">كل الأجهزة</option>${uq("deviceType").map(x=>`<option>${e(x)}</option>`).join("")}</select><select id="b"><option value="">كل الماركات</option>${uq("brand").map(x=>`<option>${e(x)}</option>`).join("")}</select></div>${admin?`<div class="row"><a class="primary" href="#/new/${test?"test":"fault"}">➕ ${test?"تيست مود جديد":"كود جديد"}</a></div>`:""}<div id="res"></div>`;
 const go=()=>{const q=N($("#q").value),a=$("#a").value,b=$("#b").value;const r=D.faults.filter(x=>(x.kind=="test")==test&&(!a||x.deviceType==a)&&(!b||x.brand==b)&&(!q||N(Y.FK.concat(Y.TK).map(k=>x[k]).join(" ")).includes(q)));
-$("#res").innerHTML=(r.length?`<div class="mu">${r.length} نتيجة</div>`+r.slice(0,100).map(fitem).join(""):`<div class="item mu">لا توجد نتائج${D.faults.length?"":". لم تُضَف أكواد بعد — استورد ملفًا أو أضف من الإدارة."}</div>`)+(r.length>100?'<div class="mu">أول 100 نتيجة. ضيّق البحث.</div>':"");if($("#q").value.trim())hi("mw_rs",{q:$("#q").value.trim()})};
+$("#res").innerHTML=(r.length?`<div class="res-bar"><span>${r.length} نتيجة${r.length>100?" (أول 100)":""}</span>${$("#q").value?`<button type="button" class="secondary" id="clr">مسح البحث</button>`:""}</div>`+r.slice(0,100).map(fitem).join(""):`<div class="empty-state"><div class="icon">🔍</div>${D.faults.length?"لا توجد نتائج مطابقة. جرّب كودًا أو ماركة أخرى.":"لم تُضَف أكواد بعد — استورد ملفًا من الإدارة."}</div>`);
+if($("#clr"))$("#clr").onclick=()=>{$("#q").value="";$("#a").value="";$("#b").value="";go()};if($("#q").value.trim())hi("mw_rs",{q:$("#q").value.trim()})};
 ["q","a","b"].forEach(i=>$("#"+i).oninput=go);go()}
-function fdetail(id){const r=D.faults.find(x=>x.id==id);if(!r)return app.innerHTML=warn("السجل غير موجود");const t=(r.kind=="test"?"تيست مود: ":"")+(r.code||r.title),h="#/fault/"+id;hi("mw_rv",{id,t:t+" — "+(r.brand||""),h});
-const keys=(r.kind=="test"?Y.TK:Y.FK);app.innerHTML=`<h2>${e(t)}</h2><dl>${recs(r,keys)}</dl>
-<div class="row"><button class="primary" id="cp">نسخ</button>${favBtn("f",id)}</div>${admin?`<div class="row"><a class="secondary" href="#/edit/${r.kind=="test"?"test":"fault"}/${id}">تعديل</a><button class="danger-btn" id="del">حذف</button></div>`:""}
-${r.kind!="test"?(()=>{const s=D.faults.filter(x=>x.id!=id&&x.kind!="test"&&N(x.code)==N(r.code));return s.length?`<h2>نفس الكود عند ماركات/موديلات أخرى</h2>`+s.map(fitem).join(""):""})():""}`;
-$("#cp").onclick=()=>copy(keys.filter(k=>r[k]).map(k=>LB[k]+": "+r[k]).join("\n"));wireFav("f",id,t,h,()=>fdetail(id));
-if(admin)$("#del").onclick=()=>{if(confirm("حذف نهائي؟")&&safe()&&commit(d=>{d.faults=d.faults.filter(x=>x.id!=id)}))location.hash="#/faults"}}
+function fdetail(id){
+const r=D.faults.find(x=>x.id==id);
+if(!r)return app.innerHTML=warn("السجل غير موجود");
+const isTest=r.kind=="test";
+const t=(isTest?"تيست مود: ":"")+(r.code||r.title),h="#/fault/"+id;
+hi("mw_rv",{id,t:t+" — "+(r.brand||""),h});
+const meta=[r.deviceType,r.brand,r.category,r.model].filter(Boolean).map(x=>`<span class="tag">${e(x)}</span>`).join("");
+const stepsToList=v=>{
+  if(!v)return"";
+  const lines=String(v).split(/\n+/).map(x=>x.replace(/^\s*[\d\-\.\*•]+\s*/,"").trim()).filter(Boolean);
+  if(lines.length<=1)return`<div class="sec-body" style="white-space:pre-wrap">${e(v)}</div>`;
+  return`<div class="sec-body"><ol class="steps-list">${lines.map(l=>`<li>${e(l)}</li>`).join("")}</ol></div>`;
+};
+const sec=(title,body,open)=>body?`<details class="detail-section"${open?" open":""}><summary>${title}</summary>${typeof body==="string"&&body.startsWith("<")?body:`<div class="sec-body" style="white-space:pre-wrap">${e(body)}</div>`}</details>`:"";
+let sections="";
+if(isTest){
+  sections+=sec("📥 طريقة الدخول",r.enter,true);
+  sections+=sec("🧪 الاختبارات",r.tests?stepsToList(r.tests):"",true);
+  sections+=sec("📤 طريقة الخروج",r.exit,false);
+  sections+=sec("📝 ملاحظات",r.note,false);
+}else{
+  sections+=sec("📌 وصف العطل",r.title||r.cause?null:null,false);
+  if(r.cause)sections+=sec("🔍 الأسباب المحتملة",r.cause,true);
+  if(r.fix)sections+=sec("🛠️ الفحص والحل",stepsToList(r.fix),true);
+  if(r.note)sections+=sec("📝 ملاحظات",r.note,false);
+}
+const sameCode=!isTest?D.faults.filter(x=>x.id!=id&&x.kind!="test"&&N(x.code)==N(r.code)):[];
+app.innerHTML=`<div class="detail-hero">
+${isTest?`<div class="badge badge-info" style="margin-bottom:8px">تيست مود</div><div class="model-lg">${e(r.title||"")}</div>`:`<div class="code-lg" dir="ltr">${e(r.code||"")}</div>${r.title?`<div class="rc-title">${e(r.title)}</div>`:""}`}
+<div class="sub">${meta}</div>
+</div>
+${sections}
+<div class="action-bar">
+<button class="primary" id="cp">📋 نسخ</button>
+${favBtn("f",id)}
+</div>
+${admin?`<div class="row"><a class="secondary" href="#/edit/${isTest?"test":"fault"}/${id}">تعديل</a><button class="danger-btn" id="del">حذف</button></div>`:""}
+${sameCode.length?`<h2>نفس الكود عند ماركات أخرى</h2>`+sameCode.map(fitem).join(""):""}`;
+const keys=isTest?Y.TK:Y.FK;
+$("#cp").onclick=()=>copy(keys.filter(k=>r[k]).map(k=>LB[k]+": "+r[k]).join("\n"));
+wireFav("f",id,t,h,()=>fdetail(id));
+if(admin)$("#del").onclick=()=>{if(confirm("حذف نهائي؟")&&safe()&&commit(d=>{d.faults=d.faults.filter(x=>x.id!=id)}))location.hash="#/faults"};
+}
 async function compsPage(q0=""){app.innerHTML=`<div class="mu" id="st">جارٍ تحميل القاعدة المرجعية…</div>`;let A,B;try{B=await base();A=await comps()}catch(x){return app.innerHTML=warn(e(x.message)+" — تأكد من وجود الملف compressors-base.js بجوار التطبيق.")}
 app.innerHTML=`<input id="q" type="search" value="${e(q0)}" placeholder="رقم الموديل (جزء منه يكفي)…" autocomplete="off"><div class="row"><select id="b"><option value="">كل الماركات</option>${[...new Set(A.map(x=>x.b))].sort().map(x=>`<option>${e(x)}</option>`).join("")}</select><button id="cm" class="secondary">قارن المحدد</button></div>
 ${admin?'<a class="secondary" href="#/new/comp">+ إضافة كباس</a>':""}<div id="res"></div>`;
 let tm;const go=()=>{const q=N($("#q").value),b=$("#b").value;let n=0,out=[];for(let i=0;i<A.length&&out.length<100;i++){const x=A[i];if((!b||x.b==b)&&(!q||x.n.includes(q)))out.push(citem(x,i,A))}
-const tot=A.filter(x=>(!b||x.b==b)&&(!q||x.n.includes(q))).length;$("#res").innerHTML=`<div class="mu">${tot} نتيجة${tot>100?" (يُعرض أول 100، ضيّق البحث)":""}</div>`+(out.join("")||'<div class="item mu">لا توجد نتائج</div>');if($("#q").value.trim())hi("mw_rs",{q:$("#q").value.trim()})};
+const tot=A.filter(x=>(!b||x.b==b)&&(!q||x.n.includes(q))).length;$("#res").innerHTML=`<div class="res-bar"><span>${tot} نتيجة${tot>100?" (أول 100)":""}</span>${$("#q").value?`<button type="button" class="secondary" id="clr">مسح</button>`:""}</div>`+(out.join("")||'<div class="empty-state"><div class="icon">🧊</div>لا توجد نتائج</div>');
+if($("#clr"))$("#clr").onclick=()=>{$("#q").value="";$("#b").value="";go()};if($("#q").value.trim())hi("mw_rs",{q:$("#q").value.trim()})};
 $("#q").oninput=()=>{clearTimeout(tm);tm=setTimeout(go,120)};$("#b").onchange=go;go();
 $("#cm").onclick=()=>{const ids=[...document.querySelectorAll(".cmp:checked")].map(x=>x.value);ids.length<2?alert("اختر كباسين على الأقل"):location.hash="#/cmp/"+ids.join(",")}}
-async function cdetail(i){const A=await comps(),x=A[i];if(!x)return app.innerHTML=warn("السجل غير موجود");const t=x.r.model+" — "+x.b,h="#/comp/"+i;hi("mw_rv",{id:"c"+i,t,h});
-const tc=x.r.temp_capacity&&Object.keys(x.r.temp_capacity).length?`<dt>السعة عند درجات الحرارة</dt><dd>${Object.entries(x.r.temp_capacity).map(([a,b])=>e(a+"°: "+b)).join("\n")}</dd>`:"";
-app.innerHTML=`<h2 dir="ltr" style="text-align:right">${e(t)}</h2>${altBox(A,i,1)}<dl><dt>الماركة</dt><dd>${e(x.b)}</dd>${recs(x.r,["model"].concat(Y.CK))}${tc}</dl>
-<div class="row"><button class="primary" id="cp">نسخ</button>${favBtn("c","c"+i)}</div>${admin&&x.cid?`<div class="row"><a class="secondary" href="#/edit/comp/${e(x.cid)}">تعديل</a><button class="danger-btn" id="del">حذف</button></div>`:""}`;
-$("#cp").onclick=()=>copy(x.b+"\n"+Y.CK.concat("model").filter(k=>x.r[k]!=null).map(k=>LB[k]+": "+x.r[k]).join("\n"));wireFav("c","c"+i,t,h,()=>cdetail(i));
-if(admin&&x.cid)$("#del").onclick=()=>{if(confirm("حذف نهائي؟")&&safe()&&commit(d=>{d.custom=d.custom.filter(c=>c.id!=x.cid)}))location.hash="#/comps"}}
+async function cdetail(i){
+const A=await comps(),x=A[i];
+if(!x)return app.innerHTML=warn("السجل غير موجود");
+const r=x.r,t=r.model+" — "+x.b,h="#/comp/"+i;
+hi("mw_rv",{id:"c"+i,t,h});
+const cell=(lab,val)=>val!=null&&val!==""?`<div class="spec-cell"><div class="lab">${lab}</div><div class="val">${e(String(val))}</div></div>`:"";
+const elec=[cell("الجهد/التردد",r.voltage_frequency||(r.freq!=null?r.freq+" Hz":null)),cell("التيار (A)",r.amp),cell("القدرة الكهربائية (W)",r.watt),cell("مكثف التشغيل",r.run_capacitor),cell("مكثف البدء",r.start_capacitor)].filter(Boolean).join("");
+const cap=[cell("القدرة (حصان)",r.hp?r.hp+" HP":null),cell("Kcal",r.kcal),cell("BTU",r.btu),cell("الإزاحة (cc)",r.displacement),cell("RPM",r.rpm)].filter(Boolean).join("");
+const gas=[cell("وسيط التبريد",r.refrigerant),cell("التطبيق",r.application),cell("كمية الزيت",r.oil_qty!=null?(r.oil_qty+(r.oil_unit?" "+r.oil_unit:"")):null)].filter(Boolean).join("");
+const tc=r.temp_capacity&&Object.keys(r.temp_capacity).length
+  ?`<details class="detail-section"><summary>🌡️ السعة عند درجات الحرارة</summary><div class="sec-body"><div class="specs-grid">${Object.entries(r.temp_capacity).map(([a,b])=>cell(a+"°",b)).join("")}</div></div></details>`:"";
+const notes=r.notes?`<details class="detail-section"><summary>📝 ملاحظات</summary><div class="sec-body" style="white-space:pre-wrap">${e(r.notes)}</div></details>`:"";
+app.innerHTML=`<div class="detail-hero">
+<div class="model-lg" dir="ltr">${e(r.model)}</div>
+<div class="sub">${e(x.b)}${x.base?"":" · إضافة محلية"}</div>
+<div class="rc-specs" style="margin-top:10px">
+${r.hp?`<span class="spec-chip em">${e(String(r.hp))} HP</span>`:""}
+${r.refrigerant?`<span class="spec-chip">${e(String(r.refrigerant))}</span>`:""}
+${r.application?`<span class="spec-chip">${e(String(r.application))}</span>`:""}
+${r.kcal!=null?`<span class="spec-chip">${e(String(r.kcal))} Kcal</span>`:r.btu!=null?`<span class="spec-chip">${e(String(r.btu))} BTU</span>`:""}
+</div>
+</div>
+${elec?`<details class="detail-section" open><summary>⚡ المواصفات الكهربائية</summary><div class="sec-body"><div class="specs-grid">${elec}</div></div></details>`:""}
+${cap?`<details class="detail-section" open><summary>❄️ القدرة والتبريد</summary><div class="sec-body"><div class="specs-grid">${cap}</div></div></details>`:""}
+${gas?`<details class="detail-section" open><summary>🧪 الفريون والزيت</summary><div class="sec-body"><div class="specs-grid">${gas}</div></div></details>`:""}
+${tc}${notes}
+<div class="action-bar">
+<button class="primary" id="cp">📋 نسخ المواصفات</button>
+<button class="secondary btn-copy-sm" id="cpm" type="button">نسخ الموديل</button>
+${favBtn("c","c"+i)}
+</div>
+${altBox(A,i,1).replace('class="alt-box"','class="alt-box alt-box-full"')}
+<div class="notice" style="font-size:0.82rem">⚠️ قرار الاستبدال يحتاج مراجعة متطلبات الجهاز وظروف التشغيل. المطابقة المحسوبة ليست ضمان توافق من الشركة المصنّعة.</div>
+${admin&&x.cid?`<div class="row"><a class="secondary" href="#/edit/comp/${e(x.cid)}">تعديل</a><button class="danger-btn" id="del">حذف</button></div>`:""}`;
+$("#cp").onclick=()=>copy(x.b+"\n"+Y.CK.concat("model").filter(k=>r[k]!=null&&r[k]!=="").map(k=>(LB[k]||k)+": "+r[k]).join("\n"));
+$("#cpm").onclick=()=>copy(String(r.model));
+wireFav("c","c"+i,t,h,()=>cdetail(i));
+if(admin&&x.cid)$("#del").onclick=()=>{if(confirm("حذف نهائي؟")&&safe()&&commit(d=>{d.custom=d.custom.filter(c=>c.id!=x.cid)}))location.hash="#/comps"};
+}
 async function cmpView(ids){const A=await comps(),rs=ids.split(",").map(i=>A[i]).filter(Boolean),ks=["model"].concat(Y.CK);
-app.innerHTML=`<h2>مقارنة الكباسات</h2><div style="overflow-x:auto"><table><tr><th></th>${rs.map(x=>`<th dir="ltr">${e(x.b)}</th>`).join("")}</tr>${ks.map(k=>{const v=rs.map(x=>x.r[k]==null||x.r[k]===""?"غير متاح":String(x.r[k])),d=new Set(v).size>1;return`<tr><td>${LB[k]}</td>${v.map(y=>`<td class="${d?"df":""}">${e(y)}</td>`).join("")}</tr>`}).join("")}</table></div>`}
+if(rs.length<2)return app.innerHTML=warn("اختر كباسين على الأقل للمقارنة.");
+app.innerHTML=`<div class="detail-hero"><div class="rc-title">مقارنة ${rs.length} كباسات</div><div class="sub">الفروق مظلّلة — ليست ضمان توافق للاستبدال</div></div>
+<div class="cmp-table-wrap"><table><tr><th>المواصفة</th>${rs.map(x=>`<th dir="ltr">${e(x.r.model)}<br><small class="mu">${e(x.b)}</small></th>`).join("")}</tr>
+${ks.map(k=>{const v=rs.map(x=>x.r[k]==null||x.r[k]===""?"—":String(x.r[k])),d=new Set(v.filter(x=>x!=="—")).size>1;return`<tr><td>${LB[k]||k}</td>${v.map(y=>`<td class="${d&&y!=="—"?"df":""}" dir="ltr">${e(y)}</td>`).join("")}</tr>`}).join("")}
+</table></div>
+<div class="notice" style="font-size:0.82rem">⚠️ لا تُعتبر الكباسات متوافقة للاستبدال لمجرد تقارب القدرة. راجع متطلبات الجهاز وظروف التشغيل.</div>
+<div class="row"><a class="secondary" href="#/comps">← العودة للكباسات</a></div>`}
 /* ---- نموذج الإضافة والتعديل ---- */
 function form(kind,id){if(!admin)return location.hash="#/admin";const F=FORMS[kind];let rec={};
 if(id){if(kind=="comp"){const c=D.custom.find(x=>x.id==id);if(!c)return app.innerHTML=warn("غير موجود");rec={brand:c.brand,...c.rec}}else{rec=D.faults.find(x=>x.id==id)||{}}}
